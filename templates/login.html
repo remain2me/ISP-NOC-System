@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOC Command Center — Login</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --panel-bg: #111111;
+            --border-color: #222222;
+            --text-main: #ededed;
+            --text-muted: #888888;
+            --accent: #3b82f6;
+            --green: #10b981;
+            --red: #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-card {
+            width: 380px;
+            max-width: 90%;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        .brand {
+            font-size: 1.4rem; font-weight: 600; color: white; margin-bottom: 0.4rem;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .brand-dot {
+            width: 10px; height: 10px; background-color: var(--green);
+            border-radius: 50%; box-shadow: 0 0 10px var(--green);
+        }
+        .subtitle {
+            color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem;
+        }
+
+        .field-label {
+            font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 0.5rem; display: block;
+        }
+        .field-input {
+            width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
+            color: var(--text-main); padding: 0.75rem 0.9rem; font-family: 'Inter', sans-serif;
+            font-size: 0.95rem; box-sizing: border-box; margin-bottom: 1.4rem;
+        }
+        .field-input:focus { outline: none; border-color: var(--accent); }
+
+        .login-btn {
+            width: 100%; background: var(--accent); color: white; border: none;
+            padding: 0.85rem 1.2rem; border-radius: 8px; font-weight: 600;
+            font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;
+        }
+        .login-btn:hover { opacity: 0.88; }
+
+        .error-box {
+            background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--red); padding: 0.75rem 1rem; border-radius: 8px;
+            font-size: 0.88rem; margin-bottom: 1.4rem;
+        }
+
+        .hint {
+            margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);
+        }
+        .hint code {
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px;
+            padding: 0.1rem 0.4rem; font-family: 'JetBrains Mono', monospace; color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="brand"><div class="brand-dot"></div> NOC Monitor</div>
+        <div class="subtitle">Sign in to access the command center</div>
+
+        {% if error %}
+        <div class="error-box">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <label class="field-label" for="username">Username</label>
+            <input class="field-input" type="text" id="username" name="username" autocomplete="username" autofocus required>
+
+            <label class="field-label" for="password">Password</label>
+            <input class="field-input" type="password" id="password" name="password" autocomplete="current-password" required>
+
+            <button class="login-btn" type="submit">Sign In</button>
+        </form>
+
+        <div class="hint">Demo credentials: <code>admin</code> / <code>admin</code></div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOC Command Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        :root {
+            --bg-color: #050505;
+            --panel-bg: #111111;
+            --sidebar-bg: #0a0a0a;
+            --border-color: #222222;
+            --text-main: #ededed;
+            --text-muted: #888888;
+            --accent: #3b82f6;
+            --green: #10b981;
+            --red: #ef4444;
+            --orange: #f59e0b;
+            --yellow: #eab308;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Left Nav Sidebar --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 2rem 1rem;
+            z-index: 10;
+        }
+        .brand {
+            font-size: 1.4rem; font-weight: 600; color: white; margin-bottom: 3rem;
+            padding-left: 1rem; display: flex; align-items: center; gap: 10px;
+        }
+        .brand-dot {
+            width: 10px; height: 10px; background-color: var(--green);
+            border-radius: 50%; box-shadow: 0 0 10px var(--green);
+        }
+        .nav-link {
+            padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px; color: var(--text-muted);
+            cursor: pointer; transition: all 0.2s ease; font-weight: 500;
+        }
+        .nav-link:hover { background-color: var(--panel-bg); color: white; }
+        .nav-link.active { background-color: #1a1a1a; color: var(--accent); border: 1px solid var(--border-color); }
+
+        /* --- Main Content Area --- */
+        .main-content { flex: 1; padding: 3rem; overflow-y: auto; position: relative; }
+        .view-section { display: none; animation: fadeIn 0.4s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        h1, h2, h3 { margin-top: 0; font-weight: 600; }
+        h1 { font-size: 2rem; margin-bottom: 2rem; letter-spacing: -0.5px; }
+        h2 { font-size: 1.2rem; margin-bottom: 1.2rem; color: #fff; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color); }
+
+        /* --- Active Tickets (now inside the Alerts tab, not a persistent sidebar) --- */
+        .ticket-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .ticket-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .ticket-list .ticket-card { margin-bottom: 0; }
+        
+        .ticket-card {
+            background: #140d0d; border: 1px solid #331515; border-left: 4px solid var(--red);
+            padding: 1rem; border-radius: 8px; margin-bottom: 1rem; animation: slideIn 0.3s ease;
+            cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
+        }
+        .ticket-card:hover { transform: translateY(-2px); background: #1a1010; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+        
+        .ticket-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+        .ticket-device { font-weight: 600; font-size: 0.95rem; color: #fff; }
+        .ticket-id { font-size: 0.75rem; color: var(--red); }
+        .ticket-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; line-height: 1.4; }
+        .ticket-time { font-size: 0.75rem; color: #666; font-family: 'JetBrains Mono', monospace; }
+
+        /* --- Home & Dashboard Styles --- */
+        .hero-card { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2.5rem; margin-bottom: 2rem; line-height: 1.6; }
+        .hero-card h3 { font-size: 1.3rem; color: var(--accent); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 8px; }
+        .hero-card p { color: var(--text-muted); font-size: 1rem; margin-bottom: 0; text-align: justify; }
+
+        .stats-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2.5rem; }
+        .stats-container-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2.5rem; }
+        .stat-box { background: var(--panel-bg); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; text-align: center; }
+        .stat-value { font-size: 2.5rem; font-weight: 600; margin-top: 0.5rem; font-family: 'JetBrains Mono', monospace; }
+
+        .live-badge {
+            display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem;
+            color: var(--green); font-weight: 500; margin-bottom: 2rem;
+        }
+        .live-dot {
+            width: 8px; height: 8px; background-color: var(--green); border-radius: 50%;
+            box-shadow: 0 0 8px var(--green); animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem; }
+        .feature-card {
+            background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px;
+            padding: 1.5rem; line-height: 1.5;
+        }
+        .feature-card-icon { font-size: 1.4rem; margin-bottom: 0.6rem; display: block; }
+        .feature-card h4 { margin: 0 0 0.5rem 0; font-size: 1rem; color: #fff; }
+        .feature-card p { margin: 0; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; }
+
+        .table-wrapper { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 2.5rem; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 1.2rem; border-bottom: 1px solid var(--border-color); }
+        th { background: #151515; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        /* Interactive Table Rows */
+        .clickable-row { cursor: pointer; transition: background-color 0.2s; }
+        .clickable-row:hover { background-color: #1a1a1a; border-left: 2px solid var(--accent); }
+
+        .clickable-card { cursor: pointer; transition: all 0.2s ease; }
+        .clickable-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.5); }
+        tbody tr:last-child td { border-bottom: none; }
+        
+        .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+        .status-online { color: var(--green); text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); font-weight: 500; }
+        .status-offline { color: var(--red); text-shadow: 0 0 10px rgba(239, 68, 68, 0.3); font-weight: 500; }
+        .status-unknown { color: var(--orange); text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); font-weight: 500; }
+        
+        .graph-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        .graph-card { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; }
+
+        /* --- Modal Overlay Styles --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center; z-index: 100;
+            opacity: 0; transition: opacity 0.2s ease;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-content {
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 2.5rem; width: 500px; max-width: 90%;
+            transform: translateY(20px); transition: transform 0.3s ease;
+            position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        .close-btn {
+            position: absolute; top: 1.5rem; right: 1.5rem; background: none; border: none;
+            color: var(--text-muted); font-size: 1.5rem; cursor: pointer;
+        }
+        .close-btn:hover { color: white; }
+        
+        .modal-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+        .modal-stat { background: #1a1a1a; padding: 1rem; border-radius: 8px; border: 1px solid #2a2a2a; }
+        .modal-stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .modal-stat-value { font-size: 1.5rem; font-weight: bold; font-family: 'JetBrains Mono', monospace; }
+
+        /* --- Editable Ticket Fields (ETR + notes) --- */
+        .ticket-field-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin: 1.2rem 0 0.5rem; }
+        .ticket-input, .ticket-textarea {
+            width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
+            color: var(--text-main); padding: 0.65rem 0.8rem; font-family: 'Inter', sans-serif;
+            font-size: 0.9rem; box-sizing: border-box; resize: vertical;
+        }
+        .ticket-input:focus, .ticket-textarea:focus { outline: none; border-color: var(--accent); }
+        .ticket-textarea { min-height: 60px; line-height: 1.4; }
+        .save-ticket-btn {
+            background: var(--accent); color: white; border: none; padding: 0.8rem 1.2rem;
+            border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 1.5rem; width: 100%;
+            font-size: 0.95rem; transition: opacity 0.2s;
+        }
+        .save-ticket-btn:hover { opacity: 0.88; }
+        .save-ticket-btn:disabled { opacity: 0.6; cursor: default; }
+
+        /* --- Alert Acknowledgement --- */
+        .ack-badge {
+            display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+            border-radius: 12px; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+            white-space: nowrap; transition: opacity 0.15s;
+        }
+        .ack-badge:hover { opacity: 0.8; }
+        .ack-badge-new { background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.4); }
+        .ack-badge-new .ack-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse 1.6s ease-in-out infinite; }
+        .ack-badge-done { background: rgba(16, 185, 129, 0.12); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .ack-toggle-btn {
+            background: transparent; border: 1px solid var(--border-color); color: var(--text-main);
+            padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; width: 100%; margin-top: 0.8rem; transition: all 0.2s;
+        }
+        .ack-toggle-btn.is-acked { border-color: var(--green); color: var(--green); }
+        .ack-toggle-btn:not(.is-acked) { border-color: var(--red); color: var(--red); }
+        .ack-toggle-btn:hover { opacity: 0.85; }
+
+        /* --- Severity --- */
+        .sev-badge {
+            display: inline-flex; align-items: center; padding: 4px 10px;
+            border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+        }
+        .sev-CRITICAL { background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.4); }
+        .sev-MAJOR { background: rgba(245, 158, 11, 0.15); color: var(--orange); border: 1px solid rgba(245, 158, 11, 0.4); }
+        .sev-MINOR { background: rgba(234, 179, 8, 0.15); color: var(--yellow); border: 1px solid rgba(234, 179, 8, 0.4); }
+        .sev-WARNING { background: rgba(59, 130, 246, 0.15); color: var(--accent); border: 1px solid rgba(59, 130, 246, 0.4); }
+        .filter-select.sev-select { min-width: 150px; }
+
+        /* --- Filter Bar (Devices / Alerts / Tickets sidebar) --- */
+        .filter-bar {
+            display: flex; align-items: flex-end; gap: 1.2rem; flex-wrap: wrap;
+            margin-bottom: 1.2rem; padding: 1rem 1.2rem; background: var(--panel-bg);
+            border: 1px solid var(--border-color); border-radius: 10px;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 0.4rem; }
+        .filter-group-search { flex: 1; min-width: 200px; }
+        .filter-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .filter-select {
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
+            color: var(--text-main); padding: 0.5rem 0.7rem; font-family: 'Inter', sans-serif;
+            font-size: 0.9rem; min-width: 160px;
+        }
+        .filter-group-search .filter-select { width: 100%; min-width: unset; }
+        .filter-select:focus { outline: none; border-color: var(--accent); }
+        .filter-count { font-size: 0.85rem; color: var(--text-muted); margin-left: auto; align-self: center; white-space: nowrap; }
+
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="brand"><div class="brand-dot"></div> NOC Monitor</div>
+        <div class="nav-link" onclick="switchTab('home')" id="nav-home">🏠 Home Overview</div>
+        <div class="nav-link" onclick="switchTab('devices')" id="nav-devices">📡 Live Devices</div>
+        <div class="nav-link" onclick="switchTab('alerts')" id="nav-alerts">🚨 Alerts</div>
+        <div class="nav-link" onclick="switchTab('tickets')" id="nav-tickets">🎫 Tickets</div>
+        <div class="nav-link" onclick="switchTab('analytics')" id="nav-analytics">📊 Analytics Graphs</div>
+        <div class="nav-link" style="margin-top: auto; color: var(--text-muted);" onclick="window.location.href='/logout'">🚪 Log Out</div>
+    </aside>
+
+    <main class="main-content">
+        <div id="view-home" class="view-section">
+            <h1>Platform Overview</h1>
+            <div class="live-badge"><span class="live-dot"></span> Live — data refreshes automatically every 5 seconds</div>
+
+            <div class="stats-container-4">
+                <div class="stat-box clickable-card" onclick="goToDevicesFiltered('all')">
+                    <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Devices Monitored</div>
+                    <div class="stat-value" id="home-stat-devices" style="color: var(--accent);">{{ devices|length }}</div>
+                </div>
+                <div class="stat-box clickable-card" onclick="goToDevicesFiltered('OLT')">
+                    <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Network Zones</div>
+                    <div class="stat-value" id="home-stat-zones" style="color: var(--accent);">{{ zone_list|length }}</div>
+                </div>
+                <div class="stat-box clickable-card" onclick="goToDevicesFiltered('ONU')">
+                    <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Subscriber Connections</div>
+                    <div class="stat-value" id="home-stat-customers" style="color: var(--accent);">{{ total_network_users }}</div>
+                </div>
+                <div class="stat-box clickable-card" onclick="switchTab('alerts')">
+                    <div style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Live Uptime</div>
+                    <div class="stat-value" id="home-stat-uptime" style="color: var(--green);">{{ (((total_network_users - total_users_affected) / total_network_users * 100) if total_network_users else 100)|round(1) }}%</div>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+                    <h3 style="margin:0;">🚨 Active Alerts</h3>
+                    <span style="color: var(--accent); cursor:pointer; font-size:0.85rem; font-weight:600;" onclick="switchTab('alerts')">View All Alerts →</span>
+                </div>
+                <div id="home-alerts-preview">
+                    <!-- Rendered by renderHomeAlertsPreview() in JS from ticketsData, both on
+                         initial load and every refresh -- one code path, not two to keep in sync. -->
+                </div>
+            </div>
+
+            <div class="hero-card clickable-card" onclick="openInfoModal('what-is-this')">
+                <h3>🔍 What This Platform Is</h3>
+                <p>This is a live Network Operations Center dashboard for a simulated city-wide fiber (GPON) network — modeled on Delhi, across 5 regions and 25 zones. The network is structured as a real four-tier hierarchy: <strong>Core Router → Regional POP → Zone OLT → Passive Splitter → Customer ONU</strong>, currently representing {{ total_network_users }} subscriber connections across {{ devices|length }} devices.</p>
+                <div style="margin-top:0.8rem; font-size:0.8rem; color: var(--accent); font-weight: 600;">Click to read more →</div>
+            </div>
+
+            <div class="hero-card clickable-card" onclick="openInfoModal('how-it-works')">
+                <h3>⚙️ How It Works</h3>
+                <p>A background monitor process reads a simulated network-state file every 5 seconds and reports every device's status to the backend in a single batched request — not one call per device — so the whole network is checked well within each polling cycle even at this scale. Tickets open and resolve automatically, and the dashboard refreshes live in the background with zero page reloads.</p>
+                <div style="margin-top:0.8rem; font-size:0.8rem; color: var(--accent); font-weight: 600;">Click to read more →</div>
+            </div>
+
+            <h2 style="margin-top: 0.5rem;">Key Capabilities</h2>
+            <div class="feature-grid">
+                <div class="feature-card clickable-card" onclick="openInfoModal('feature-monitoring')">
+                    <span class="feature-card-icon">📡</span>
+                    <h4>Live Device Monitoring</h4>
+                    <p>Every Core, POP, OLT, Splitter, and ONU tracked in real time, filterable by device type and by zone.</p>
+                </div>
+                <div class="feature-card clickable-card" onclick="openInfoModal('feature-ticketing')">
+                    <span class="feature-card-icon">🚨</span>
+                    <h4>Automatic Ticketing</h4>
+                    <p>A ticket opens the moment a device goes offline and auto-resolves the moment it recovers — no manual entry.</p>
+                </div>
+                <div class="feature-card clickable-card" onclick="openInfoModal('feature-blast-radius')">
+                    <span class="feature-card-icon">🎯</span>
+                    <h4>Real Blast-Radius Analysis</h4>
+                    <p>Subscriber impact is calculated by walking the actual fiber tree, not a formula — so the number is always correct, including cascading failures.</p>
+                </div>
+                <div class="feature-card clickable-card" onclick="openInfoModal('feature-workflow')">
+                    <span class="feature-card-icon">📝</span>
+                    <h4>Editable Incident Workflow</h4>
+                    <p>Each ticket supports an ETR plus three separate notes — for the partner, the internal team, and the public — saved directly to the record.</p>
+                </div>
+                <div class="feature-card clickable-card" onclick="openInfoModal('feature-filtering')">
+                    <span class="feature-card-icon">🔎</span>
+                    <h4>PON / Zone Filtering</h4>
+                    <p>Instantly narrow Devices, Alerts, or Tickets down to a single zone or a single device type — OLTs, splitters (PON), or customer ONUs.</p>
+                </div>
+                <div class="feature-card clickable-card" onclick="openInfoModal('feature-analytics')">
+                    <span class="feature-card-icon">📊</span>
+                    <h4>Historical Analytics</h4>
+                    <p>Subscriber online/affected counts are logged over time, so outages and recoveries show up as real dips and recoveries on the chart, not a static snapshot.</p>
+                </div>
+            </div>
+
+            <div class="hero-card clickable-card" onclick="openInfoModal('why-approach')">
+                <h3>💡 Why This Approach</h3>
+                <p>A status board that only shows red or green isn't enough to run a network on — the questions that actually matter during an incident are "how many customers does this affect" and "what's already being done about it." This dashboard treats both as first-class data.</p>
+                <div style="margin-top:0.8rem; font-size:0.8rem; color: var(--accent); font-weight: 600;">Click to read more →</div>
+            </div>
+        </div>
+
+        <div id="view-devices" class="view-section">
+            <h1>Infrastructure Status</h1>
+            
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Total Alerts</div>
+                    <div class="stat-value" style="color: var(--red);" id="stat-total-alerts-devices">{{ total_alerts }}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Active Tickets</div>
+                    <div class="stat-value" style="color: var(--orange);" id="stat-active-tickets-devices">{{ active_tickets }}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">System Status</div>
+                    <div class="stat-value" style="color: var(--green); font-size: 1.8rem; margin-top: 1rem;">STABLE</div>
+                </div>
+            </div>
+
+            <h2>Live Devices</h2>
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label class="filter-label">Device Type</label>
+                    <select class="filter-select" id="dev-filter-type" onchange="filterDevicesTable()">
+                        <option value="all">All Types</option>
+                        <option value="Core">Core / POP</option>
+                        <option value="OLT" selected>OLT</option>
+                        <option value="Splitter">PON (Splitter)</option>
+                        <option value="ONU">Customer ONU</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Zone</label>
+                    <select class="filter-select" id="dev-filter-zone" onchange="filterDevicesTable()">
+                        <option value="all">All Zones</option>
+                        {% for zone in zone_list %}
+                        <option value="{{ zone }}">{{ zone|replace('OLT_', '')|replace('_', ' ') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group filter-group-search">
+                    <label class="filter-label">Search</label>
+                    <input type="text" class="filter-select" id="dev-filter-search" placeholder="Device name or IP..." oninput="filterDevicesTable()">
+                </div>
+                <div class="filter-count" id="dev-filter-count"></div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Device Name</th>
+                            <th>IP Address</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Latency</th>
+                        </tr>
+                    </thead>
+                    <tbody id="devices-tbody">
+                        <!-- Rendered by renderDevicesTable() in JS from devicesData, both on
+                             initial load and every refresh -- one code path, not two to keep in sync. -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="view-alerts" class="view-section">
+            <h1>Alert Management</h1>
+
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Total Alerts</div>
+                    <div class="stat-value" style="color: var(--red);" id="stat-total-alerts-alerts">{{ total_alerts }}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Active Incidents</div>
+                    <div class="stat-value" style="color: var(--orange);" id="stat-active-tickets-alerts">{{ active_tickets }}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Total Users Impacted</div>
+                    <div class="stat-value" style="color: var(--red);" id="total-users-impacted">{{ total_users_affected|default(0) }}</div>
+                </div>
+            </div>
+
+            <h2>All Alerts</h2>
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label class="filter-label">Device Type</label>
+                    <select class="filter-select" id="alert-filter-type" onchange="filterAlertsTable()">
+                        <option value="all" selected>All Types</option>
+                        <option value="Core">Core / POP</option>
+                        <option value="OLT">OLT</option>
+                        <option value="Splitter">PON (Splitter)</option>
+                        <option value="ONU">Customer ONU</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Zone</label>
+                    <select class="filter-select" id="alert-filter-zone" onchange="filterAlertsTable()">
+                        <option value="all">All Zones</option>
+                        {% for zone in zone_list %}
+                        <option value="{{ zone }}">{{ zone|replace('OLT_', '')|replace('_', ' ') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Severity</label>
+                    <select class="filter-select sev-select" id="alert-filter-severity" onchange="filterAlertsTable()">
+                        <option value="all" selected>All Severities</option>
+                        <option value="CRITICAL">Critical</option>
+                        <option value="MAJOR">Major</option>
+                        <option value="MINOR">Minor</option>
+                        <option value="WARNING">Warning</option>
+                    </select>
+                </div>
+                <div class="filter-count" id="alert-filter-count"></div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Alert ID</th>
+                            <th>Device</th>
+                            <th>Severity</th>
+                            <th>IP Address</th>
+                            <th>PON</th>
+                            <th>Down Since</th>
+                            <th>Duration</th>
+                            <th>Users Affected</th>
+                            <th>Status</th>
+                            <th>Ack</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <!-- Rendered by renderAlertsTable() in JS from ticketsData, both on
+                             initial load and every refresh -- one code path, not two to keep in sync. -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="view-tickets" class="view-section">
+            <h1>Tickets</h1>
+
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Active Tickets</div>
+                    <div class="stat-value" style="color: var(--orange);" id="stat-active-tickets-ticketsview">{{ active_tickets }}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Total Alerts Logged</div>
+                    <div class="stat-value" style="color: var(--red);" id="stat-total-alerts-ticketsview">{{ total_alerts }}</div>
+                </div>
+                <div class="stat-box">
+                    <div style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Auto-Resolve</div>
+                    <div class="stat-value" style="color: var(--green); font-size: 1.8rem; margin-top: 1rem;">ENABLED</div>
+                </div>
+            </div>
+
+            <h2>Open Tickets</h2>
+            <select class="filter-select" id="ticket-filter-type" onchange="filterTicketCards()" style="margin-bottom: 1.2rem;">
+                <option value="all" selected>All Device Types</option>
+                <option value="Core">Core / POP</option>
+                <option value="OLT">OLT</option>
+                <option value="Splitter">PON (Splitter)</option>
+                <option value="ONU">Customer ONU</option>
+            </select>
+            <div class="ticket-list" id="tickets-sidebar-list">
+                <!-- Rendered by renderTicketSidebar() in JS from ticketsData, both on
+                     initial load and every refresh -- one code path, not two to keep in sync. -->
+            </div>
+        </div>
+
+        <div id="view-analytics" class="view-section">
+            <h1>Network Analytics</h1>
+            <div class="graph-grid">
+                <div class="graph-card">
+                    <h2 style="border:none;">Users Online Over Time</h2>
+                    <canvas id="latencyChart"></canvas>
+                </div>
+                <div class="graph-card">
+                    <h2 style="border:none;">Current User Impact</h2>
+                    <canvas id="uptimeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal-backdrop" class="modal-overlay" onclick="closeModal(event)">
+        
+        <div id="device-modal" class="modal-content" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="forceCloseModal()">×</button>
+            <h2 id="mdl-dev-name" style="font-size: 1.5rem; border:none; margin-bottom: 0.2rem;">Device Name</h2>
+            <p id="mdl-dev-ip" class="mono" style="color: var(--text-muted); margin-top: 0;">192.168.x.x</p>
+            
+            <div style="margin: 1.5rem 0;">
+                <span id="mdl-dev-status" style="padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-transform: uppercase;">STATUS</span>
+            </div>
+
+            <div class="modal-stat-grid">
+                <div class="modal-stat">
+                    <div class="modal-stat-label">Provisioned Users</div>
+                    <div class="modal-stat-value" id="mdl-dev-total">0</div>
+                </div>
+                <div class="modal-stat" id="mdl-stat-affected-box">
+                    <div class="modal-stat-label" id="mdl-affected-label">Affected Users</div>
+                    <div class="modal-stat-value" id="mdl-dev-affected">0</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted);" id="mdl-progress-title">Impact Radius</span>
+                    <span id="mdl-dev-percent" style="font-weight: bold; font-family: monospace;">0%</span>
+                </div>
+                <div style="width: 100%; background: #2a2a2a; height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div id="mdl-dev-bar" style="height: 100%; background: var(--accent); width: 0%;"></div>
+                </div>
+            </div>
+
+            <div class="ticket-field-label" style="margin-top: 1.5rem;">Maintenance</div>
+            <div id="mdl-dev-maintenance-active" style="display:none; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1rem;">
+                <p style="margin: 0 0 0.3rem 0; color: var(--accent); font-size: 0.9rem;" id="mdl-dev-maintenance-info">Under maintenance</p>
+                <button class="save-ticket-btn" style="background: var(--red); margin-top: 0.6rem;" onclick="endMaintenanceForCurrentDevice()">End Maintenance Early</button>
+            </div>
+            <div id="mdl-dev-maintenance-form">
+                <input type="text" class="ticket-input" id="mdl-dev-maintenance-reason" placeholder="Reason, e.g. Firmware upgrade" style="margin-bottom: 0.6rem;">
+                <select class="filter-select" id="mdl-dev-maintenance-duration" style="width: 100%; margin-bottom: 0.6rem;">
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>1 hour</option>
+                    <option value="240">4 hours</option>
+                    <option value="">Indefinite (until manually ended)</option>
+                </select>
+                <button class="save-ticket-btn" style="background: var(--accent);" onclick="startMaintenanceForCurrentDevice()">🔧 Schedule Maintenance</button>
+            </div>
+        </div>
+
+        <div id="ticket-modal" class="modal-content" style="display:none; max-height: 85vh; overflow-y: auto;" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="forceCloseModal()">×</button>
+            <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin:0; border:none;">Incident Ticket</h2>
+                <div style="display:flex; align-items:center; gap: 0.6rem;">
+                    <span id="mdl-tk-severity"></span>
+                    <span id="mdl-tk-id" class="mono" style="color: var(--red); font-weight: bold;">#ID</span>
+                </div>
+            </div>
+            
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.3rem;">Target Node</p>
+            <p id="mdl-tk-dev" style="font-size: 1.2rem; font-weight: bold; margin-top: 0; color: #fff;">Device Name</p>
+
+            <button class="ack-toggle-btn" id="mdl-tk-ack-btn" onclick="toggleAcknowledge(currentTicketId, event)">● Unacknowledged — Click to Acknowledge</button>
+
+            <div class="modal-stat-grid">
+                <div class="modal-stat">
+                    <div class="modal-stat-label">Opened</div>
+                    <div class="modal-stat-value mono" id="mdl-tk-time" style="font-size: 1rem;">Time</div>
+                </div>
+                <div class="modal-stat">
+                    <div class="modal-stat-label">SLA Target</div>
+                    <div class="modal-stat-value mono" id="mdl-tk-sla" style="font-size: 1rem;">—</div>
+                </div>
+            </div>
+
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; margin-top: 1.5rem;">
+                <p style="color: var(--red); margin: 0; font-size: 0.9rem; line-height: 1.5;" id="mdl-tk-summary">
+                    Automated ICMP heartbeat failed. Node is unresponsive to API polls.
+                </p>
+            </div>
+
+            <div class="ticket-field-label">Estimated Time to Repair (ETR)</div>
+            <input type="text" class="ticket-input" id="mdl-tk-etr" placeholder="e.g. 2026-07-09 18:00, or '2 hours'">
+
+            <div class="ticket-field-label">Note to Partner</div>
+            <textarea class="ticket-textarea" id="mdl-tk-note-partner" placeholder="Internal note shared with the partner / carrier..."></textarea>
+
+            <div class="ticket-field-label">Note to Company (US)</div>
+            <textarea class="ticket-textarea" id="mdl-tk-note-company" placeholder="Internal note for the US team..."></textarea>
+
+            <div class="ticket-field-label">Public Note</div>
+            <textarea class="ticket-textarea" id="mdl-tk-note-public" placeholder="Customer-facing status update..."></textarea>
+
+            <button class="save-ticket-btn" id="mdl-tk-save-btn" onclick="saveTicketDetails()">Save Ticket</button>
+        </div>
+
+        <div id="alert-modal" class="modal-content" style="display:none;" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="forceCloseModal()">×</button>
+            <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin:0; border:none;">Alert Details</h2>
+                <div style="display:flex; align-items:center; gap: 0.6rem;">
+                    <span id="almdl-severity"></span>
+                    <span id="almdl-id" class="mono" style="color: var(--red); font-weight: bold;">#ID</span>
+                </div>
+            </div>
+
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.3rem;">Device</p>
+            <p id="almdl-device" style="font-size: 1.2rem; font-weight: bold; margin-top: 0; color: #fff;">Device Name</p>
+
+            <button class="ack-toggle-btn" id="almdl-ack-btn" onclick="toggleAcknowledge(currentAlertTicketId, event)">● Unacknowledged — Click to Acknowledge</button>
+
+            <div class="modal-stat-grid" style="grid-template-columns: 1fr 1fr;">
+                <div class="modal-stat">
+                    <div class="modal-stat-label">IP Address</div>
+                    <div class="modal-stat-value mono" id="almdl-ip" style="font-size: 1.1rem;">—</div>
+                </div>
+                <div class="modal-stat">
+                    <div class="modal-stat-label">PON</div>
+                    <div class="modal-stat-value mono" id="almdl-pon" style="font-size: 1.1rem;">—</div>
+                </div>
+                <div class="modal-stat">
+                    <div class="modal-stat-label">Down Since</div>
+                    <div class="modal-stat-value mono" id="almdl-down-since" style="font-size: 1rem;">—</div>
+                </div>
+                <div class="modal-stat">
+                    <div class="modal-stat-label">Duration</div>
+                    <div class="modal-stat-value mono" id="almdl-duration" style="font-size: 1rem; color: var(--red);">—</div>
+                </div>
+                <div class="modal-stat">
+                    <div class="modal-stat-label">Provisioned Users</div>
+                    <div class="modal-stat-value" id="almdl-provisioned">0</div>
+                </div>
+                <div class="modal-stat">
+                    <div class="modal-stat-label">Users Affected</div>
+                    <div class="modal-stat-value" id="almdl-affected" style="color: var(--red);">0</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">Outage Blast Radius</span>
+                    <span id="almdl-percent" style="font-weight: bold; font-family: monospace;">0%</span>
+                </div>
+                <div style="width: 100%; background: #2a2a2a; height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div id="almdl-bar" style="height: 100%; background: var(--red); width: 0%;"></div>
+                </div>
+            </div>
+
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; margin-top: 1.5rem;">
+                <p style="color: var(--red); margin: 0; font-size: 0.9rem; line-height: 1.5;" id="almdl-notes">
+                    Automated ICMP heartbeat failed. Node is unresponsive to API polls. Field technician dispatch protocol recommended.
+                </p>
+            </div>
+
+            <button class="save-ticket-btn" id="almdl-open-ticket-btn" onclick="openTicketModalById(currentAlertTicketId)">📋 Open Ticket to Edit</button>
+        </div>
+
+        <div id="info-modal" class="modal-content" style="display:none; max-height: 85vh; overflow-y: auto;" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="forceCloseModal()">×</button>
+            <h2 id="infomdl-title" style="font-size: 1.4rem; border:none; margin-bottom: 1.2rem;">Title</h2>
+
+            <div class="modal-stat-grid" id="infomdl-facts"></div>
+
+            <div id="infomdl-body" style="margin-top: 1.5rem; color: var(--text-muted); line-height: 1.7; font-size: 0.95rem;"></div>
+
+            <button class="save-ticket-btn" id="infomdl-cta">CTA</button>
+        </div>
+
+    </div>
+
+    <!-- Ticket/alert data rendered server-side by Flask/Jinja. type="application/json" means
+         browsers never execute it and code editors never lint it as JavaScript — it's parsed
+         explicitly via JSON.parse() in the script block below. -->
+    <script type="application/json" id="tickets-data-json">{{ tickets|default([])|tojson }}</script>
+
+    <!-- Real users-online / users-affected / latency history for the Analytics charts,
+         one snapshot recorded per dashboard load. Same reasoning as above for the type. -->
+    <script type="application/json" id="chart-data-json">{{ chart_data|default({'labels': [], 'users_online': [], 'users_affected': [], 'avg_latency': []})|tojson }}</script>
+
+    <!-- Real per-device data (including real total/online/offline customer counts
+         computed server-side from the actual topology). Same reasoning as above. -->
+    <script type="application/json" id="devices-data-json">{{ devices|default([])|tojson }}</script>
+
+    <!-- Active maintenance windows. Same reasoning as above for the type. -->
+    <script type="application/json" id="maintenance-data-json">{{ maintenance_windows|default([])|tojson }}</script>
+
+    <script>
+        // --- Modal & Data Logic ---
+        let isModalOpen = false;
+        // Real total customer count (from the actual OLT/Splitter/ONU topology),
+        // not a hardcoded placeholder -- this scales percentages and chart axes
+        // to match your actual network size.
+        const TOTAL_NETWORK_USERS = Number('{{ total_network_users|default(0) }}') || 0;
+
+        // Raw ticket/alert data passed from the backend, used to power the Alerts view and its modal.
+        // It's read out of the JSON <script> tag below (see body) rather than inlined directly here,
+        // so editors/linters never try to parse the Jinja output as literal JavaScript.
+        const ticketsData = JSON.parse(document.getElementById('tickets-data-json').textContent || '[]');
+
+        // Full device list with real per-device stats (total/online/offline customers
+        // under each device, computed server-side by walking the actual topology).
+        const devicesData = JSON.parse(document.getElementById('devices-data-json').textContent || '[]');
+
+        // Active maintenance windows -- who scheduled what, on which device, until when.
+        const maintenanceData = JSON.parse(document.getElementById('maintenance-data-json').textContent || '[]');
+
+        // Real users-online/users-affected/latency history, one point per page load,
+        // recorded server-side in the metrics_history table. Powers the Analytics charts.
+        const chartData = JSON.parse(document.getElementById('chart-data-json').textContent ||
+            '{"labels":[],"users_online":[],"users_affected":[],"avg_latency":[]}');
+
+        // --- Rendering (used for the initial paint AND every AJAX refresh) ---
+        // One implementation, not a Jinja version + a JS version that could drift
+        // apart -- both the first paint and each 5-second refresh call these.
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function statusClass(status) {
+            const s = (status || '').toUpperCase();
+            if (s === 'ONLINE') return 'status-online';
+            if (s === 'OFFLINE') return 'status-offline';
+            return 'status-unknown';
+        }
+
+        function renderSeverityBadge(t) {
+            const sev = (t.severity || 'WARNING').toUpperCase();
+            const validSev = ['CRITICAL', 'MAJOR', 'MINOR', 'WARNING'].includes(sev) ? sev : 'WARNING';
+            return `<span class="sev-badge sev-${validSev}">${validSev}</span>`;
+        }
+
+        function renderAckBadge(t) {
+            if (t.acknowledged) {
+                const title = `Acknowledged by ${t.acknowledged_by || 'someone'} at ${t.acknowledged_at || ''}`;
+                return `<span class="ack-badge ack-badge-done" title="${escapeHtml(title)}" onclick="toggleAcknowledge('${escapeHtml(t.id)}', event)">✓ Acked</span>`;
+            }
+            return `<span class="ack-badge ack-badge-new" onclick="toggleAcknowledge('${escapeHtml(t.id)}', event)"><span class="ack-dot"></span> New</span>`;
+        }
+
+        function toggleAcknowledge(ticketId, event) {
+            // Ticket cards/rows have their own onclick to open the modal --
+            // stop it from also firing when just toggling the ack badge.
+            if (event) event.stopPropagation();
+
+            fetch('/api/acknowledge_ticket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket_id: ticketId })
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data || data.status !== 'success') return;
+
+                    // Optimistic local update -- instant feedback rather than
+                    // waiting for the next 5s poll. acknowledged_by/at get the
+                    // exact server values on the next refresh; "You" / "just
+                    // now" are just a placeholder in the meantime.
+                    const ticket = ticketsData.find(t => String(t.id) === String(ticketId));
+                    if (ticket) {
+                        ticket.acknowledged = data.acknowledged;
+                        ticket.acknowledged_by = data.acknowledged ? 'You' : '';
+                        ticket.acknowledged_at = data.acknowledged ? 'just now' : '';
+                    }
+
+                    renderAlertsTable(ticketsData);
+                    renderTicketSidebar(ticketsData);
+                    filterAlertsTable();
+                    filterTicketCards();
+
+                    if (ticket) {
+                        updateAckButtonInModal(ticket);
+                    }
+                });
+        }
+
+        function renderDevicesTable(devices) {
+            const tbody = document.getElementById('devices-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = devices.map(d => {
+                const status = (d.status || 'UNKNOWN').toUpperCase();
+                const search = ((d.name || '') + ' ' + (d.ip || '')).toLowerCase();
+                return `<tr class="clickable-row" data-type="${escapeHtml(d.type)}" data-zone="${escapeHtml(d.zone || '')}" data-search="${escapeHtml(search)}" onclick="openDeviceModalByName('${escapeHtml(d.name)}')">
+                    <td style="font-weight: 500;">${escapeHtml(d.name)}</td>
+                    <td class="mono" style="color: var(--text-muted);">${escapeHtml(d.ip)}</td>
+                    <td class="mono" style="color: var(--text-muted);">${escapeHtml(d.type)}</td>
+                    <td class="${statusClass(status)}">• ${escapeHtml(status)}</td>
+                    <td class="mono">${d.latency} ms</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderAlertsTable(tickets) {
+            const tbody = document.getElementById('alerts-tbody');
+            if (!tbody) return;
+            if (!tickets.length) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color: var(--text-muted); padding: 2rem;">✅ No active alerts. All systems operational.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = tickets.map(t => `
+                <tr class="clickable-row" data-type="${escapeHtml(t.device_type || '')}" data-zone="${escapeHtml(t.zone || '')}" data-severity="${escapeHtml(t.severity || 'WARNING')}" onclick="openAlertModalById('${escapeHtml(t.id)}')">
+                    <td class="mono" style="color: var(--red);">#${escapeHtml(t.id)}</td>
+                    <td style="font-weight: 500;">${escapeHtml(t.device_name)}</td>
+                    <td>${renderSeverityBadge(t)}</td>
+                    <td class="mono" style="color: var(--text-muted);">${escapeHtml(t.ip || 'N/A')}</td>
+                    <td class="mono" style="color: var(--text-muted);">${escapeHtml(t.pon || 'N/A')}</td>
+                    <td class="mono">${escapeHtml(t.timestamp)}</td>
+                    <td class="mono" id="alert-duration-${t.id}">—</td>
+                    <td class="mono" id="alert-users-${t.id}">—</td>
+                    <td class="status-offline">• OFFLINE</td>
+                    <td>${renderAckBadge(t)}</td>
+                </tr>`).join('');
+        }
+
+        function renderTicketSidebar(tickets) {
+            const list = document.getElementById('tickets-sidebar-list');
+            if (!list) return;
+            if (!tickets.length) {
+                list.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 3rem; font-size: 0.95rem;">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">✅</div>
+                    No active incidents.<br><span style="color: var(--green);">All systems operational.</span>
+                </div>`;
+                return;
+            }
+            list.innerHTML = tickets.map(t => `
+                <div class="ticket-card" data-type="${escapeHtml(t.device_type || '')}" data-severity="${escapeHtml(t.severity || 'WARNING')}" onclick="openTicketModalById('${escapeHtml(t.id)}')">
+                    <div class="ticket-card-top">
+                        <span class="ticket-device">${escapeHtml(t.device_name)}</span>
+                        <span class="ticket-id mono">#${escapeHtml(t.id)}</span>
+                    </div>
+                    <div style="margin-bottom: 0.5rem;">${renderSeverityBadge(t)}</div>
+                    <div class="ticket-desc">Connection lost or node unreachable. Automated dispatch triggered.</div>
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-top: 0.6rem;">
+                        <div class="ticket-time">${escapeHtml(t.timestamp)}</div>
+                        ${renderAckBadge(t)}
+                    </div>
+                </div>`).join('');
+        }
+
+        function updateStatBoxes(context) {
+            const setText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+            setText('stat-total-alerts-devices', context.total_alerts);
+            setText('stat-active-tickets-devices', context.active_tickets);
+            setText('stat-total-alerts-alerts', context.total_alerts);
+            setText('stat-active-tickets-alerts', context.active_tickets);
+            setText('stat-active-tickets-ticketsview', context.active_tickets);
+            setText('stat-total-alerts-ticketsview', context.total_alerts);
+            setText('total-users-impacted', context.total_users_affected);
+
+            // Home Overview page: device/zone/subscriber counts + live uptime %.
+            // Zones are derived from devicesData itself (each device's own .zone
+            // field) rather than needing a separate zone_list in the JSON payload.
+            const totalDevices = context.devices ? context.devices.length : 0;
+            const zoneCount = context.devices
+                ? new Set(context.devices.filter(d => d.zone).map(d => d.zone)).size
+                : 0;
+            const totalCustomers = context.total_network_users || 0;
+            const affected = context.total_users_affected || 0;
+            const uptimePct = totalCustomers > 0
+                ? (((totalCustomers - affected) / totalCustomers) * 100).toFixed(1)
+                : '100.0';
+
+            setText('home-stat-devices', totalDevices.toLocaleString());
+            setText('home-stat-zones', zoneCount.toLocaleString());
+            setText('home-stat-customers', totalCustomers.toLocaleString());
+            setText('home-stat-uptime', uptimePct + '%');
+        }
+
+        function openDeviceModalByName(name) {
+            const device = devicesData.find(d => d.name === name);
+            if (!device) return;
+            openDeviceModal(device);
+        }
+
+        let currentDeviceName = null;
+
+        function openDeviceModal(device) {
+            isModalOpen = true;
+            currentDeviceName = device.name;
+            document.getElementById('modal-backdrop').classList.add('active');
+            document.getElementById('device-modal').style.display = 'block';
+            document.getElementById('ticket-modal').style.display = 'none';
+            document.getElementById('alert-modal').style.display = 'none';
+            document.getElementById('info-modal').style.display = 'none';
+
+            document.getElementById('mdl-dev-name').innerText = device.name;
+            document.getElementById('mdl-dev-ip').innerText = "IP: " + device.ip;
+
+            const statusEl = document.getElementById('mdl-dev-status');
+            const rawStatus = (device.status || 'UNKNOWN').toUpperCase().trim();
+            const underMaintenance = !!device.under_maintenance;
+            // A device under an active maintenance window shows as MAINTENANCE
+            // regardless of its raw OFFLINE/ONLINE status -- this is expected,
+            // planned downtime, not something to alarm anyone about.
+            const sanitizedStatus = underMaintenance ? 'MAINTENANCE' : rawStatus;
+            statusEl.innerText = sanitizedStatus;
+
+            // Real counts, computed server-side by walking the actual device tree --
+            // not a formula derived from the device's name/IP.
+            const totalUsers = device.total_users || 0;
+            const onlineUsers = device.online_users || 0;
+            const offlineUsers = device.offline_users || 0;
+
+            document.getElementById('mdl-dev-total').innerText = totalUsers.toLocaleString();
+
+            let affectedUsers = 0;
+            let percentImpact = 0;
+
+            if (underMaintenance) {
+                statusEl.style.background = 'rgba(59, 130, 246, 0.2)';
+                statusEl.style.color = 'var(--accent)';
+                statusEl.style.border = '1px solid var(--accent)';
+
+                affectedUsers = offlineUsers;
+                document.getElementById('mdl-affected-label').innerText = "Users Affected (Expected)";
+                document.getElementById('mdl-progress-title').innerText = "Planned Maintenance Impact";
+                document.getElementById('mdl-affected-label').style.color = 'var(--accent)';
+                document.getElementById('mdl-dev-affected').style.color = 'var(--accent)';
+                document.getElementById('mdl-dev-bar').style.background = 'var(--accent)';
+
+                percentImpact = totalUsers > 0 ? ((affectedUsers / totalUsers) * 100).toFixed(1) : '0.0';
+            } else if (rawStatus === 'OFFLINE' || rawStatus === 'DOWN') {
+                statusEl.style.background = 'rgba(239, 68, 68, 0.2)';
+                statusEl.style.color = 'var(--red)';
+                statusEl.style.border = '1px solid var(--red)';
+
+                affectedUsers = offlineUsers;
+                document.getElementById('mdl-affected-label').innerText = "Users Offline";
+                document.getElementById('mdl-progress-title').innerText = "Outage Blast Radius";
+                document.getElementById('mdl-affected-label').style.color = 'var(--red)';
+                document.getElementById('mdl-dev-affected').style.color = 'var(--red)';
+                document.getElementById('mdl-dev-bar').style.background = 'var(--red)';
+
+                percentImpact = totalUsers > 0 ? ((affectedUsers / totalUsers) * 100).toFixed(1) : '0.0';
+            } else {
+                statusEl.style.background = 'rgba(16, 185, 129, 0.2)';
+                statusEl.style.color = 'var(--green)';
+                statusEl.style.border = '1px solid var(--green)';
+
+                document.getElementById('mdl-affected-label').innerText = "Users Online";
+                document.getElementById('mdl-progress-title').innerText = "Live Online Capacity";
+                document.getElementById('mdl-affected-label').style.color = 'var(--text-muted)';
+                document.getElementById('mdl-dev-affected').style.color = '#fff';
+                document.getElementById('mdl-dev-bar').style.background = 'var(--accent)';
+
+                affectedUsers = onlineUsers;
+                percentImpact = totalUsers > 0 ? ((affectedUsers / totalUsers) * 100).toFixed(1) : '0.0';
+            }
+
+            document.getElementById('mdl-dev-affected').innerText = affectedUsers.toLocaleString();
+            document.getElementById('mdl-dev-percent').innerText = percentImpact + '%';
+            document.getElementById('mdl-dev-bar').style.width = percentImpact + '%';
+
+            // Maintenance section: show the active window + End button, or the
+            // schedule form, depending on whether this device (or an ancestor)
+            // currently has one running.
+            const activeWindow = maintenanceData.find(w => w.device_name === device.name);
+            const activeBox = document.getElementById('mdl-dev-maintenance-active');
+            const formBox = document.getElementById('mdl-dev-maintenance-form');
+            if (underMaintenance) {
+                activeBox.style.display = 'block';
+                formBox.style.display = 'none';
+                if (activeWindow) {
+                    const until = activeWindow.ends_at ? `until ${activeWindow.ends_at}` : '(indefinite)';
+                    document.getElementById('mdl-dev-maintenance-info').innerText =
+                        `Scheduled by ${activeWindow.created_by} ${until} — ${activeWindow.reason}`;
+                } else {
+                    // Covered by an ancestor's window, not one on this exact device.
+                    document.getElementById('mdl-dev-maintenance-info').innerText =
+                        'Covered by a maintenance window on an upstream device.';
+                    activeBox.querySelector('button').style.display = activeWindow ? 'block' : 'none';
+                }
+            } else {
+                activeBox.style.display = 'none';
+                formBox.style.display = 'block';
+            }
+        }
+
+        function startMaintenanceForCurrentDevice() {
+            if (!currentDeviceName) return;
+            const reason = document.getElementById('mdl-dev-maintenance-reason').value.trim() || 'Scheduled maintenance';
+            const durationRaw = document.getElementById('mdl-dev-maintenance-duration').value;
+            const payload = { device_name: currentDeviceName, reason: reason };
+            if (durationRaw) payload.duration_minutes = Number(durationRaw);
+
+            fetch('/api/maintenance/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data || data.status !== 'success') return;
+                    forceCloseModal();
+                    refreshDashboard();  // picks up the new window + updated device state immediately
+                });
+        }
+
+        function endMaintenanceForCurrentDevice() {
+            const activeWindow = maintenanceData.find(w => w.device_name === currentDeviceName);
+            if (!activeWindow) return;
+            fetch('/api/maintenance/end', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ window_id: activeWindow.id })
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data || data.status !== 'success') return;
+                    forceCloseModal();
+                    refreshDashboard();
+                });
+        }
+
+        let currentTicketId = null;
+
+        function openTicketModalById(ticketId) {
+            const ticket = ticketsData.find(t => String(t.id) === String(ticketId));
+            if (!ticket) return;
+            openTicketModal(ticket);
+        }
+
+        function openTicketModal(ticket) {
+            isModalOpen = true;
+            currentTicketId = ticket.id;
+            document.getElementById('modal-backdrop').classList.add('active');
+            document.getElementById('device-modal').style.display = 'none';
+            document.getElementById('ticket-modal').style.display = 'block';
+            document.getElementById('alert-modal').style.display = 'none';
+            document.getElementById('info-modal').style.display = 'none';
+
+            document.getElementById('mdl-tk-id').innerText = "#" + ticket.id;
+            document.getElementById('mdl-tk-severity').innerHTML = renderSeverityBadge(ticket);
+            document.getElementById('mdl-tk-dev').innerText = ticket.device_name || 'Unknown Device';
+            document.getElementById('mdl-tk-time').innerText = ticket.timestamp || ticket.created_at || 'Unknown';
+            document.getElementById('mdl-tk-sla').innerText = ticket.sla_target || 'N/A';
+            document.getElementById('mdl-tk-summary').innerText = ticket.summary ||
+                'Automated ICMP heartbeat failed. Node is unresponsive to API polls.';
+
+            // Editable fields -- pre-filled with whatever was last saved for this ticket.
+            document.getElementById('mdl-tk-etr').value = ticket.etr || '';
+            document.getElementById('mdl-tk-note-partner').value = ticket.note_partner || '';
+            document.getElementById('mdl-tk-note-company').value = ticket.note_company_us || '';
+            document.getElementById('mdl-tk-note-public').value = ticket.note_public || '';
+
+            const saveBtn = document.getElementById('mdl-tk-save-btn');
+            saveBtn.innerText = 'Save Ticket';
+            saveBtn.disabled = false;
+
+            updateAckButtonInModal(ticket);
+        }
+
+        function updateAckButtonInModal(ticket) {
+            ['mdl-tk-ack-btn', 'almdl-ack-btn'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                if (ticket.acknowledged) {
+                    btn.classList.add('is-acked');
+                    btn.innerText = `✓ Acknowledged by ${ticket.acknowledged_by || 'someone'} — Click to Undo`;
+                } else {
+                    btn.classList.remove('is-acked');
+                    btn.innerText = '● Unacknowledged — Click to Acknowledge';
+                }
+            });
+        }
+
+        function saveTicketDetails() {
+            if (!currentTicketId) return;
+            const saveBtn = document.getElementById('mdl-tk-save-btn');
+            const payload = {
+                ticket_id: currentTicketId,
+                etr: document.getElementById('mdl-tk-etr').value,
+                note_partner: document.getElementById('mdl-tk-note-partner').value,
+                note_company_us: document.getElementById('mdl-tk-note-company').value,
+                note_public: document.getElementById('mdl-tk-note-public').value
+            };
+
+            saveBtn.innerText = 'Saving...';
+            saveBtn.disabled = true;
+
+            fetch('/api/update_ticket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data) return;  // already redirecting to /login
+                    if (data.status === 'success') {
+                        // Update the in-memory copy so re-opening this ticket (or its
+                        // linked alert) shows the saved values without a page reload.
+                        const ticket = ticketsData.find(t => String(t.id) === String(currentTicketId));
+                        if (ticket) {
+                            ticket.etr = payload.etr;
+                            ticket.note_partner = payload.note_partner;
+                            ticket.note_company_us = payload.note_company_us;
+                            ticket.note_public = payload.note_public;
+                        }
+                        saveBtn.innerText = 'Saved \u2713';
+                        setTimeout(() => {
+                            saveBtn.innerText = 'Save Ticket';
+                            saveBtn.disabled = false;
+                        }, 1500);
+                    } else {
+                        saveBtn.innerText = 'Error - Retry';
+                        saveBtn.disabled = false;
+                    }
+                })
+                .catch(() => {
+                    saveBtn.innerText = 'Error - Retry';
+                    saveBtn.disabled = false;
+                });
+        }
+
+        // --- Alerts view logic ---
+
+        function computeAffectedUsers(ticket) {
+            // Prefer a real number from the backend if it's there.
+            if (ticket.users_affected !== undefined && ticket.users_affected !== null && ticket.users_affected !== '') {
+                return parseInt(ticket.users_affected) || 0;
+            }
+            // Fall back to the same estimate formula used in the device modal, so numbers stay consistent
+            // across the dashboard even before the backend sends a real users_affected field.
+            const deviceName = ticket.device_name || 'unknown';
+            const ip = ticket.ip || '0.0.0.1';
+            const ipLastOctet = parseInt((ip.split('.')[3])) || 1;
+            return (deviceName.length * 115) + (ipLastOctet * 12);
+        }
+
+
+        function computeDuration(timestamp) {
+            const downTime = new Date(timestamp);
+            if (isNaN(downTime.getTime())) return 'Unknown';
+            const diffMs = Date.now() - downTime.getTime();
+            if (diffMs < 0) return 'Just now';
+            const mins = Math.floor(diffMs / 60000);
+            if (mins < 1) return '<1 min';
+            if (mins < 60) return mins + ' min';
+            if (mins < 1440) return Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+            return Math.floor(mins / 1440) + 'd ' + Math.floor((mins % 1440) / 60) + 'h';
+        }
+
+        function populateAlertRows() {
+            let totalImpacted = 0;
+            ticketsData.forEach(ticket => {
+                const affected = computeAffectedUsers(ticket);
+                totalImpacted += affected;
+
+                const durationCell = document.getElementById('alert-duration-' + ticket.id);
+                if (durationCell) durationCell.innerText = computeDuration(ticket.timestamp);
+
+                const usersCell = document.getElementById('alert-users-' + ticket.id);
+                if (usersCell) usersCell.innerText = affected.toLocaleString();
+            });
+
+            const totalEl = document.getElementById('total-users-impacted');
+            if (totalEl) totalEl.innerText = totalImpacted.toLocaleString();
+        }
+
+        // --- Filters (Devices / Alerts / Tickets sidebar) ---
+        // All client-side: rows/cards carry data-type/data-zone attributes rendered
+        // server-side, and these just show/hide based on the selected dropdowns.
+        // No server round-trip, so filtering thousands of rows stays instant.
+        // Selections are persisted to localStorage (same pattern as activeTab) so
+        // they survive the periodic full-page reload instead of snapping back to
+        // the server-rendered default every 5 seconds.
+
+        function restoreFilterState() {
+            const devType = localStorage.getItem('devFilterType');
+            if (devType !== null) document.getElementById('dev-filter-type').value = devType;
+            const devZone = localStorage.getItem('devFilterZone');
+            if (devZone !== null) document.getElementById('dev-filter-zone').value = devZone;
+            const devSearch = localStorage.getItem('devFilterSearch');
+            if (devSearch !== null) document.getElementById('dev-filter-search').value = devSearch;
+
+            const alertType = localStorage.getItem('alertFilterType');
+            if (alertType !== null) document.getElementById('alert-filter-type').value = alertType;
+            const alertZone = localStorage.getItem('alertFilterZone');
+            if (alertZone !== null) document.getElementById('alert-filter-zone').value = alertZone;
+            const alertSeverity = localStorage.getItem('alertFilterSeverity');
+            if (alertSeverity !== null) document.getElementById('alert-filter-severity').value = alertSeverity;
+
+            const ticketType = localStorage.getItem('ticketFilterType');
+            if (ticketType !== null) document.getElementById('ticket-filter-type').value = ticketType;
+        }
+
+        function filterDevicesTable() {
+            const type = document.getElementById('dev-filter-type').value;
+            const zone = document.getElementById('dev-filter-zone').value;
+            const searchRaw = document.getElementById('dev-filter-search').value;
+            const search = searchRaw.trim().toLowerCase();
+
+            localStorage.setItem('devFilterType', type);
+            localStorage.setItem('devFilterZone', zone);
+            localStorage.setItem('devFilterSearch', searchRaw);
+
+            const rows = document.querySelectorAll('#devices-tbody tr[data-type]');
+            let visible = 0;
+            rows.forEach(row => {
+                const matchesType = (type === 'all') || (row.dataset.type === type);
+                const matchesZone = (zone === 'all') || (row.dataset.zone === zone);
+                const matchesSearch = !search || (row.dataset.search || '').includes(search);
+                const show = matchesType && matchesZone && matchesSearch;
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            const countEl = document.getElementById('dev-filter-count');
+            if (countEl) countEl.innerText = `Showing ${visible.toLocaleString()} of ${rows.length.toLocaleString()} devices`;
+        }
+
+        function filterAlertsTable() {
+            const type = document.getElementById('alert-filter-type').value;
+            const zone = document.getElementById('alert-filter-zone').value;
+            const severity = document.getElementById('alert-filter-severity').value;
+
+            localStorage.setItem('alertFilterType', type);
+            localStorage.setItem('alertFilterZone', zone);
+            localStorage.setItem('alertFilterSeverity', severity);
+
+            const rows = document.querySelectorAll('#alerts-tbody tr[data-type]');
+            let visible = 0;
+            rows.forEach(row => {
+                const matchesType = (type === 'all') || (row.dataset.type === type);
+                const matchesZone = (zone === 'all') || (row.dataset.zone === zone);
+                const matchesSeverity = (severity === 'all') || (row.dataset.severity === severity);
+                const show = matchesType && matchesZone && matchesSeverity;
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            const countEl = document.getElementById('alert-filter-count');
+            if (countEl && rows.length) countEl.innerText = `Showing ${visible.toLocaleString()} of ${rows.length.toLocaleString()} alerts`;
+        }
+
+        function filterTicketCards() {
+            const type = document.getElementById('ticket-filter-type').value;
+            localStorage.setItem('ticketFilterType', type);
+
+            const cards = document.querySelectorAll('#tickets-sidebar-list .ticket-card[data-type]');
+            cards.forEach(card => {
+                const show = (type === 'all') || (card.dataset.type === type);
+                card.style.display = show ? '' : 'none';
+            });
+        }
+
+        let currentAlertTicketId = null;
+
+        function openAlertModalById(ticketId) {
+            const ticket = ticketsData.find(t => String(t.id) === String(ticketId));
+            if (!ticket) return;
+            openAlertModal(ticket);
+        }
+
+        function openAlertModal(ticket) {
+            isModalOpen = true;
+            currentAlertTicketId = ticket.id;
+            document.getElementById('modal-backdrop').classList.add('active');
+            document.getElementById('device-modal').style.display = 'none';
+            document.getElementById('ticket-modal').style.display = 'none';
+            document.getElementById('alert-modal').style.display = 'block';
+            document.getElementById('info-modal').style.display = 'none';
+
+            const deviceName = ticket.device_name || 'Unknown Device';
+            const ip = ticket.ip || 'N/A';
+            const pon = ticket.pon || 'N/A';
+            const timestamp = ticket.timestamp || 'Unknown';
+
+            document.getElementById('almdl-id').innerText = '#' + ticket.id;
+            document.getElementById('almdl-severity').innerHTML = renderSeverityBadge(ticket);
+            document.getElementById('almdl-device').innerText = deviceName;
+            document.getElementById('almdl-ip').innerText = ip;
+            document.getElementById('almdl-pon').innerText = pon;
+            document.getElementById('almdl-down-since').innerText = timestamp;
+            document.getElementById('almdl-duration').innerText = computeDuration(timestamp);
+            updateAckButtonInModal(ticket);
+
+            const affectedUsers = computeAffectedUsers(ticket);
+
+            // "Provisioned Users" here means total subscribers on this branch of the
+            // network. Once the backend sends a real users_affected count (computed
+            // from the actual OLT/Splitter/ONU topology), that number IS the branch's
+            // full subscriber count, since the whole branch is down together — so we
+            // mirror it rather than showing an unrelated made-up estimate next to it.
+            const hasRealCount = ticket.users_affected !== undefined && ticket.users_affected !== null && ticket.users_affected !== '';
+            let provisionedUsers;
+            if (hasRealCount) {
+                provisionedUsers = affectedUsers;
+            } else {
+                const ipLastOctet = parseInt((ip.split('.')[3])) || 1;
+                provisionedUsers = ticket.provisioned_users || (deviceName.length * 115) + (ipLastOctet * 12);
+            }
+
+            document.getElementById('almdl-affected').innerText = affectedUsers.toLocaleString();
+            document.getElementById('almdl-provisioned').innerText = provisionedUsers.toLocaleString();
+
+            const percentImpact = ((affectedUsers / TOTAL_NETWORK_USERS) * 100).toFixed(2);
+            document.getElementById('almdl-percent').innerText = percentImpact + '%';
+            document.getElementById('almdl-bar').style.width = Math.min(percentImpact, 100) + '%';
+
+            document.getElementById('almdl-notes').innerText = ticket.notes ||
+                ('Automated ICMP heartbeat failed. Node unresponsive to API polls. Field technician dispatch recommended' +
+                 (pon !== 'N/A' ? ' for PON ' + pon + '.' : '.'));
+        }
+
+        function forceCloseModal() {
+            isModalOpen = false;
+            document.getElementById('modal-backdrop').classList.remove('active');
+        }
+        function closeModal(event) {
+            if (event.target.id === 'modal-backdrop') { forceCloseModal(); }
+        }
+
+        // --- Navigation Logic ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + tabId).classList.add('active');
+            document.getElementById('nav-' + tabId).classList.add('active');
+            localStorage.setItem('activeTab', tabId);
+        }
+
+        // Used by the Home page's clickable stat boxes / feature cards to jump
+        // straight into the Devices tab pre-filtered to a specific type --
+        // e.g. clicking "Subscriber Connections" takes you to just the ONUs.
+        function goToDevicesFiltered(type) {
+            switchTab('devices');
+            const typeEl = document.getElementById('dev-filter-type');
+            if (typeEl) {
+                typeEl.value = type;
+                filterDevicesTable();
+            }
+        }
+
+        // --- Home page: expanded reading content + Active Alerts preview ---
+
+        // Static copy for each Home page card. Numbers that can change live
+        // (device counts, zone counts, open tickets) are NOT baked in here --
+        // they're computed fresh in getLiveFacts() every time the modal opens,
+        // so they're always accurate even after a background refresh.
+        const homeInfoContent = {
+            'what-is-this': {
+                title: '🔍 What This Platform Is',
+                ctaLabel: 'View Live Devices →', ctaTab: 'devices', ctaFilterType: 'all',
+                body: `<p>This dashboard models a full fiber-optic (GPON) access network for a fictional Delhi-wide ISP, built exactly the way a real one is structured: a single Core Router feeds five Regional POPs (North, South, East, West, and Central Delhi), each POP feeds five Zone OLTs (real Delhi neighborhoods — Rohini, Dwarka, Saket, Karol Bagh, and more), each OLT splits its signal through several passive optical splitters, and each splitter serves a block of real customer connections (ONUs).</p>
+                        <p>Every device name and IP address is generated from one function rather than typed by hand — which is also what guarantees the tree can never drift out of sync with itself. The IP scheme is fully deterministic: each zone lives in its own address block, so no two devices can ever collide.</p>
+                        <p>Nothing you see here is a static mockup. Device status, ticket counts, subscriber-impact numbers, and PON paths are all computed live from what's actually stored in the database at that moment.</p>`
+            },
+            'how-it-works': {
+                title: '⚙️ How It Works',
+                ctaLabel: 'View Active Alerts →', ctaTab: 'alerts',
+                body: `<p>It starts with a simulated state file: flipping a device's entry to OFFLINE there is the entire simulation. A background monitor process reads that file every 5 seconds.</p>
+                        <p>Rather than checking each device with its own network request — which would take far longer than the 5-second cycle at this network's size — every device's status is bundled into a single request and applied to the database in one transaction. That one change was the difference between a full-network update taking 2.46 seconds and taking about 0.03 seconds.</p>
+                        <p>The moment a device's status flips to OFFLINE, a ticket opens automatically and a critical log entry is recorded. The moment it flips back, the ticket resolves itself and an info log entry is written — no manual step in either direction.</p>
+                        <p>Your browser never reloads the page to see any of this. Every 5 seconds it quietly asks the server for fresh data and rewrites just the parts that changed, so a scroll position, an open filter, or a ticket note you're halfway through typing is never interrupted.</p>`
+            },
+            'why-approach': {
+                title: '💡 Why This Approach',
+                ctaLabel: 'View Alerts & Tickets →', ctaTab: 'alerts',
+                body: `<p>A dashboard that only shows a device as red or green doesn't answer the question that actually matters during an incident: who does this affect, and how badly? A failed splitter and a failed core router both show up as "1 device down" — but they mean completely different things, and this dashboard is built to know the difference.</p>
+                        <p>That impact number is calculated by walking the real device tree from the point of failure downward, so a splitter outage correctly counts only the customers behind it, while an OLT or core failure correctly counts everyone beneath it. The whole network's impact is recalculated on every refresh, in milliseconds — not estimated once and left stale.</p>
+                        <p>And because "what happened" isn't the same message for every audience, each ticket keeps three separate notes — one for the partner carrier, one for the internal team, and one written for a customer-facing status page — instead of a single field everyone has to awkwardly share.</p>`
+            },
+            'feature-monitoring': {
+                title: '📡 Live Device Monitoring',
+                ctaLabel: 'View Live Devices →', ctaTab: 'devices', ctaFilterType: 'all',
+                body: `<p>All four device types in the network — Core routers, Regional POPs, Zone OLTs, passive Splitters, and Customer ONUs — report live status, filterable instantly by type or by zone with no server round-trip.</p>
+                        <p>The Devices view defaults to showing just the OLTs, since browsing thousands of devices unfiltered isn't a useful starting point — you drill down into a specific zone or device type from there.</p>`
+            },
+            'feature-ticketing': {
+                title: '🚨 Automatic Ticketing',
+                ctaLabel: 'View Alerts →', ctaTab: 'alerts',
+                body: `<p>A ticket opens the instant any device's status changes to OFFLINE, and resolves automatically the instant it changes back to ONLINE — there's no manual "create ticket" step anywhere in the flow.</p>
+                        <p>Every state change is also written to a permanent log, separate from the ticket itself, so the full history of what happened and when is never lost even after a ticket is resolved.</p>`
+            },
+            'feature-blast-radius': {
+                title: '🎯 Real Blast-Radius Analysis',
+                ctaLabel: 'View Alerts →', ctaTab: 'alerts',
+                body: `<p>Rather than re-scanning the network from scratch for every device — which would get slow fast at this scale — impact is calculated bottom-up: each device's affected-customer count is computed once from its own children, and reused by whatever's above it in the tree.</p>
+                        <p>That's what makes it possible to calculate real impact for every device in a network this size in well under a hundredth of a second, on every single refresh.</p>`
+            },
+            'feature-workflow': {
+                title: '📝 Editable Incident Workflow',
+                ctaLabel: 'View Alerts & Tickets →', ctaTab: 'alerts',
+                body: `<p>Every ticket carries an Estimated Time to Repair and three independent note fields — one for the partner/carrier, one for the internal team, and one written for a public-facing status update — so the same incident can be described differently for each audience without anyone editing around someone else's notes.</p>
+                        <p>Changes save immediately back to the ticket record through a dedicated endpoint.</p>`
+            },
+            'feature-filtering': {
+                title: '🔎 PON / Zone Filtering',
+                ctaLabel: 'View Live Devices →', ctaTab: 'devices', ctaFilterType: 'OLT',
+                body: `<p>A "zone" here means everything downstream of one Zone OLT — its splitters and every customer behind them. Devices, Alerts, and Tickets can all be filtered down to a single zone or a single device type (Core, OLT, Splitter/PON, or Customer ONU) at once.</p>
+                        <p>Filtering happens entirely in the browser against data already on the page, so narrowing thousands of rows down to the one zone you care about is instant.</p>`
+            },
+            'feature-analytics': {
+                title: '📊 Historical Analytics',
+                ctaLabel: 'View Analytics →', ctaTab: 'analytics',
+                body: `<p>Every 5 seconds, the current subscriber online/affected counts are logged to a running history (the most recent 30 snapshots are kept), which is what actually powers the line chart.</p>
+                        <p>An outage shows up as a real, visible dip and the recovery shows up as a real climb back up — the chart reflects what actually happened, not just whatever the number happens to be the moment you load the page.</p>`
+            },
+        };
+
+        function getLiveFacts(key) {
+            const totalDevices = devicesData.length;
+            const zoneCount = new Set(devicesData.filter(d => d.zone).map(d => d.zone)).size;
+            const totalCustomers = TOTAL_NETWORK_USERS;
+            const openTickets = ticketsData.length;
+            const facts = {
+                'what-is-this': [
+                    { label: 'Regions', value: '5' },
+                    { label: 'Zones (OLTs)', value: zoneCount },
+                    { label: 'Total Devices', value: totalDevices.toLocaleString() },
+                    { label: 'Subscribers', value: totalCustomers.toLocaleString() },
+                ],
+                'how-it-works': [
+                    { label: 'Refresh Interval', value: '5 seconds' },
+                    { label: 'Full Network Update', value: '~0.03s' },
+                    { label: 'Manual Steps', value: '0' },
+                ],
+                'why-approach': [
+                    { label: 'Note Fields / Ticket', value: '3' },
+                    { label: 'Impact Calculation', value: 'Real-time tree walk' },
+                    { label: 'ETR Field', value: 'Yes' },
+                ],
+                'feature-monitoring': [
+                    { label: 'Device Types', value: '4' },
+                    { label: 'Default View', value: zoneCount + ' Zones' },
+                    { label: 'Filter Speed', value: 'Instant' },
+                ],
+                'feature-ticketing': [
+                    { label: 'Open Tickets Now', value: openTickets },
+                    { label: 'Auto-Resolve', value: 'Yes' },
+                    { label: 'History Logged', value: 'Yes' },
+                ],
+                'feature-blast-radius': [
+                    { label: 'Devices Covered', value: totalDevices.toLocaleString() },
+                    { label: 'Recalculated', value: 'Every refresh' },
+                    { label: 'Approach', value: 'Bottom-up tree' },
+                ],
+                'feature-workflow': [
+                    { label: 'Editable Fields', value: 'ETR + 3 notes' },
+                    { label: 'Saves', value: 'Instantly' },
+                ],
+                'feature-filtering': [
+                    { label: 'Zones Available', value: zoneCount },
+                    { label: 'Applies To', value: 'Devices, Alerts, Tickets' },
+                    { label: 'Round-trip', value: 'None (client-side)' },
+                ],
+                'feature-analytics': [
+                    { label: 'Snapshot Interval', value: '5s' },
+                    { label: 'History Retained', value: 'Last 30 points' },
+                ],
+            };
+            return facts[key] || [];
+        }
+
+        function goToFromModal(tab, filterType) {
+            forceCloseModal();
+            if (filterType) {
+                goToDevicesFiltered(filterType);
+            } else {
+                switchTab(tab);
+            }
+        }
+
+        function openInfoModal(key) {
+            const content = homeInfoContent[key];
+            if (!content) return;
+
+            isModalOpen = true;
+            document.getElementById('modal-backdrop').classList.add('active');
+            document.getElementById('device-modal').style.display = 'none';
+            document.getElementById('ticket-modal').style.display = 'none';
+            document.getElementById('alert-modal').style.display = 'none';
+            document.getElementById('info-modal').style.display = 'block';
+
+            document.getElementById('infomdl-title').innerText = content.title;
+            document.getElementById('infomdl-body').innerHTML = content.body;
+
+            const facts = getLiveFacts(key);
+            document.getElementById('infomdl-facts').innerHTML = facts.map(f => `
+                <div class="modal-stat">
+                    <div class="modal-stat-label">${escapeHtml(f.label)}</div>
+                    <div class="modal-stat-value" style="font-size: 1.1rem;">${escapeHtml(String(f.value))}</div>
+                </div>`).join('');
+
+            const ctaBtn = document.getElementById('infomdl-cta');
+            ctaBtn.innerText = content.ctaLabel;
+            ctaBtn.onclick = () => goToFromModal(content.ctaTab, content.ctaFilterType);
+        }
+
+        function renderHomeAlertsPreview(tickets) {
+            const container = document.getElementById('home-alerts-preview');
+            if (!container) return;
+
+            if (!tickets.length) {
+                container.innerHTML = `<div style="text-align:center; color: var(--text-muted); padding: 1rem 0;">
+                    <div style="font-size: 1.8rem; margin-bottom: 0.5rem;">✅</div>
+                    No active incidents. <span style="color: var(--green);">All systems operational.</span>
+                </div>`;
+                return;
+            }
+
+            const preview = tickets.slice(0, 4);
+            let html = `<div class="ticket-list">` + preview.map(t => `
+                <div class="ticket-card" onclick="event.stopPropagation(); openAlertModalById('${escapeHtml(t.id)}')">
+                    <div class="ticket-card-top">
+                        <span class="ticket-device">${escapeHtml(t.device_name)}</span>
+                        <span class="ticket-id mono">#${escapeHtml(t.id)}</span>
+                    </div>
+                    <div class="ticket-desc">${escapeHtml(t.pon || 'PON unavailable')} — ${escapeHtml(String(t.users_affected ?? 'N/A'))} users affected</div>
+                    <div class="ticket-time">${escapeHtml(t.timestamp || '')}</div>
+                </div>`).join('') + `</div>`;
+
+            if (tickets.length > 4) {
+                html += `<div style="text-align:center; margin-top:1rem; color: var(--text-muted); font-size:0.85rem;">
+                    + ${tickets.length - 4} more — <span style="color:var(--accent); cursor:pointer;" onclick="event.stopPropagation(); switchTab('alerts')">view all</span>
+                </div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        const savedTab = localStorage.getItem('activeTab') || 'home';
+        switchTab(savedTab);
+        renderDevicesTable(devicesData);
+        renderAlertsTable(ticketsData);
+        renderTicketSidebar(ticketsData);
+        renderHomeAlertsPreview(ticketsData);
+        populateAlertRows();
+        restoreFilterState();
+        filterDevicesTable();
+        filterAlertsTable();
+        filterTicketCards();
+
+        // --- Graph Generation ---
+        Chart.defaults.color = '#888888';
+        Chart.defaults.font.family = 'Inter';
+
+        // Line chart: real users-online history, one point per page load. Dips when
+        // something goes offline, climbs back up when it's resolved.
+        const usersChart = new Chart(document.getElementById('latencyChart'), {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Users Online',
+                    data: chartData.users_online,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                animation: false,
+                scales: { y: { beginAtZero: true, suggestedMax: TOTAL_NETWORK_USERS } }
+            }
+        });
+
+        // Donut: current live split of users online vs. users affected right now,
+        // taken from the most recent snapshot (falls back to "everyone online" if
+        // no history exists yet).
+        const latestOnline = chartData.users_online.length
+            ? chartData.users_online[chartData.users_online.length - 1]
+            : TOTAL_NETWORK_USERS;
+        const latestAffected = chartData.users_affected.length
+            ? chartData.users_affected[chartData.users_affected.length - 1]
+            : 0;
+        const impactChart = new Chart(document.getElementById('uptimeChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Users Online', 'Users Affected'],
+                datasets: [{ data: [latestOnline, latestAffected], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }]
+            },
+            options: { animation: false, cutout: '75%' }
+        });
+
+        // --- Live refresh: fetches fresh data and patches the page in place.
+        // No full page reload -- no lost scroll position, no reset filters, no
+        // interrupting a modal you have open. Paused while a modal is open so an
+        // in-progress ticket edit is never overwritten mid-type.
+        function refreshDashboard() {
+            if (isModalOpen) return;
+
+            fetch('/api/dashboard_data')
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data) return;  // already redirecting to /login
+                    if (data.status !== 'success') {
+                        console.error('Dashboard refresh error:', data.error);
+                        return;
+                    }
+
+                    // Swap in the fresh data (mutate in place -- these are const
+                    // bindings, but their contents are freely replaceable).
+                    ticketsData.length = 0;
+                    ticketsData.push(...data.tickets);
+                    devicesData.length = 0;
+                    devicesData.push(...data.devices);
+                    maintenanceData.length = 0;
+                    maintenanceData.push(...(data.maintenance_windows || []));
+                    Object.assign(chartData, data.chart_data);
+
+                    // Re-render from the fresh data, then recompute the alert
+                    // table's duration/users-affected columns and stat boxes.
+                    renderDevicesTable(data.devices);
+                    renderAlertsTable(data.tickets);
+                    renderTicketSidebar(data.tickets);
+                    renderHomeAlertsPreview(data.tickets);
+                    populateAlertRows();
+                    updateStatBoxes(data);
+
+                    // Dropdowns/search box are untouched DOM nodes (no reload
+                    // happened), so the user's current selection is naturally
+                    // still there -- just re-apply it to the freshly rendered rows.
+                    filterDevicesTable();
+                    filterAlertsTable();
+                    filterTicketCards();
+
+                    // Charts: update in place instead of recreating them.
+                    usersChart.data.labels = data.chart_data.labels;
+                    usersChart.data.datasets[0].data = data.chart_data.users_online;
+                    usersChart.options.scales.y.suggestedMax = data.total_network_users;
+                    usersChart.update('none');
+
+                    const newestOnline = data.chart_data.users_online.length
+                        ? data.chart_data.users_online[data.chart_data.users_online.length - 1]
+                        : data.total_network_users;
+                    const newestAffected = data.chart_data.users_affected.length
+                        ? data.chart_data.users_affected[data.chart_data.users_affected.length - 1]
+                        : 0;
+                    impactChart.data.datasets[0].data = [newestOnline, newestAffected];
+                    impactChart.update('none');
+                })
+                .catch(err => console.error('Dashboard refresh failed:', err));
+        }
+
+        setInterval(refreshDashboard, 5000);
+    </script>
+</body>
+</html>
